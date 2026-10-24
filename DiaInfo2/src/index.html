@@ -1,0 +1,789 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<!-- The page can't make any network requests at all: everything stays in this browser -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
+<title>DiaInfo</title>
+<style>
+  :root{--bg:#000;--fg:#fff;--accent:#a78bfa;--field:#1c1c1c;--border:#5a5a5a;--muted:#aaa;--red:#ff5252}
+  *{box-sizing:border-box}
+  html{background:var(--bg)}
+  body{margin:0;background:var(--bg);color:var(--fg);font-family:Poppins,Montserrat,"Century Gothic","Avenir Next","Segoe UI","Trebuchet MS",Verdana,sans-serif;line-height:1.4}
+  main{max-width:720px;margin:0 auto;padding:20px 16px 40px}
+  .screen{display:none;min-height:calc(100vh - 60px);flex-direction:column}
+  .screen.active{display:flex}
+  .grow{flex:1}
+  h1{margin:12px 0;text-align:center;font-weight:700}
+  h1.big{font-size:clamp(30px,8vw,44px);margin:40px 0 28px}
+  h1.mid{font-size:clamp(20px,5vw,26px);text-align:left}
+  h1.small{font-size:clamp(20px,5vw,28px);text-align:left;margin-bottom:0}
+  .anim span{display:inline-block;white-space:pre;opacity:0}
+  .anim.go span{animation:rise .8s cubic-bezier(.215,.61,.355,1) both}
+  @keyframes rise{from{opacity:0;transform:translateY(26px)}to{opacity:1;transform:none}}
+  @media (prefers-reduced-motion:reduce){.anim span{opacity:1;animation:none!important}}
+  .sub{font-size:18px;margin:2px 0 8px}
+  .stack{display:flex;flex-direction:column;gap:8px;max-width:480px;width:100%;margin:0 auto}
+  .prompt{font-size:18px;text-align:center;margin:0 0 6px}
+  label{font-size:14px}
+  input,select{width:100%;background:var(--field);color:var(--fg);border:1px solid var(--border);border-radius:0;padding:8px 10px;font:inherit;font-size:16px}
+  select{padding:9px 8px}
+  input:focus,select:focus,.btn:focus-visible,summary:focus-visible,.details:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  input.bad{border-color:var(--red)}
+  .hint{color:var(--muted);font-size:12px;margin:2px 0 6px}
+  .passbox{margin-top:14px;display:flex;flex-direction:column;gap:6px}
+  .passbox>label{font-size:16px}
+  .err{color:var(--red);font-size:14px;text-align:center;min-height:22px;margin:4px 0;white-space:pre-line}
+  .ferr{color:var(--red);font-size:12px;min-height:18px;margin-top:2px}
+  .buttons{display:flex;flex-wrap:wrap;gap:10px;margin-top:18px;align-items:center}
+  .btn{background:var(--field);color:var(--fg);border:1px solid var(--accent);padding:8px 20px;font:inherit;font-weight:700;font-size:14px;cursor:pointer;border-radius:0}
+  .btn:hover{background:#262626}
+  .btn.warn{color:var(--red);border-color:var(--red)}
+  .topbar{margin-bottom:6px}
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;align-items:start}
+  .row>label{padding-top:9px}
+  .info summary{cursor:pointer;list-style:none;padding-top:9px;font-size:14px;display:flex;align-items:center;gap:8px;width:max-content}
+  .info summary::-webkit-details-marker{display:none}
+  .info summary::after{content:"";border-left:6px solid var(--accent);border-top:5px solid transparent;border-bottom:5px solid transparent;transition:transform .15s}
+  .info[open] summary::after{transform:rotate(90deg)}
+  .info summary:hover{color:var(--accent)}
+  .info p{margin:8px 0 0;padding-left:10px;border-left:3px solid var(--accent);font-size:13px;color:#e1e1e1}
+  .donut{display:block;width:240px;height:240px;margin:8px auto}
+  .donut .num{fill:#fff;font-weight:700;font-size:72px;font-family:inherit}
+  .donut .cap{fill:var(--muted);font-size:13px;font-family:inherit}
+  .tip{border:1px solid var(--accent);padding:8px 12px;margin:8px 0 12px}
+  .tip h2{margin:0;color:var(--accent);font-size:12px}
+  .tip p{margin:4px 0}
+  .tip .foot{color:var(--muted);font-size:12px;font-style:italic}
+  .details{white-space:pre-wrap;word-wrap:break-word;font:inherit;font-size:14px;border:1px solid var(--border);padding:8px;margin:0;max-height:340px;overflow:auto}
+  .med{position:relative;height:60vh;min-height:320px}
+  .mstep{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;font-weight:700;line-height:1.15;padding:0 8px}
+  .mline{display:flex;flex-wrap:wrap;justify-content:center}
+  .mword{display:flex;white-space:nowrap}
+  .mstep span{opacity:0;display:inline-block}
+  .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+  noscript p{color:var(--red);text-align:center;margin-top:40px}
+  @media (max-width:520px){.row{grid-template-columns:1fr;gap:2px}.row>label,.info summary{padding-top:0}}
+</style>
+</head>
+<body>
+<noscript><p>DiaInfo needs JavaScript to run.</p></noscript>
+<main>
+
+<!-- ===== Screen 1: Welcome + name ===== -->
+<section id="s-name" class="screen">
+  <h1 class="anim big" id="t-welcome"></h1>
+  <div class="grow">
+    <div class="stack">
+      <label class="prompt" for="nameField">What is your name?</label>
+      <input id="nameField" type="text" maxlength="50" autocomplete="off">
+      <div class="err" id="nameError" role="alert"></div>
+      <div class="passbox" id="passPanel">
+        <label for="passField">Create a passcode</label>
+        <p class="hint">Your health details are encrypted with this passcode. Use 8+ characters with a letter and a number. You'll need your name and passcode each time you open DiaInfo.</p>
+        <input id="passField" type="password" maxlength="128" autocomplete="new-password">
+        <label for="confirmField">Confirm passcode</label>
+        <input id="confirmField" type="password" maxlength="128" autocomplete="new-password">
+        <div class="err" id="passError" role="alert"></div>
+      </div>
+    </div>
+  </div>
+  <div class="buttons"><button class="btn" id="nameBack" type="button">Back</button><button class="btn" id="nameNext" type="button">Next</button></div>
+</section>
+
+<!-- ===== Screen 2: Enter the variables ===== -->
+<section id="s-data" class="screen">
+  <h1 class="anim small" id="t-welcomeBack"></h1>
+  <p class="sub">Evaluating Your Risk of Diabetes:</p>
+  <div class="grow" style="margin-top:12px">
+    <div class="row"><label for="ageField">Age:</label><div><input id="ageField" type="text" inputmode="numeric" autocomplete="off" maxlength="20"><div class="ferr" id="ageError"></div></div></div>
+    <div class="row"><label for="bmiField">BMI:</label><div><input id="bmiField" type="text" inputmode="decimal" autocomplete="off" maxlength="20"><div class="ferr" id="bmiError"></div></div></div>
+    <div class="row"><label for="bpField">Blood Pressure (mmHg):</label><div><input id="bpField" type="text" inputmode="decimal" autocomplete="off" maxlength="20"><div class="ferr" id="bpError"></div></div></div>
+    <div class="row"><label for="exerciseField">Weekly Exercise (hours):</label><div><input id="exerciseField" type="text" inputmode="decimal" autocomplete="off" maxlength="20"><div class="ferr" id="exerciseError"></div></div></div>
+    <div class="row"><label for="familyBox">Family History of Diabetes:</label><div><select id="familyBox"><option>No</option><option>Yes</option></select></div></div>
+    <div class="row"><details class="info"><summary>Polyuria:</summary><p>Excessive or Abnormally Large Amounts of Urine</p></details><div><select id="polyuriaBox" aria-label="Polyuria"><option>No</option><option>Yes</option></select></div></div>
+    <div class="row"><details class="info"><summary>Polydipsia:</summary><p>Excessive Thirst and Excessive Drinking of Liquids</p></details><div><select id="polydipsiaBox" aria-label="Polydipsia"><option>No</option><option>Yes</option></select></div></div>
+    <div class="row"><label for="weightLossBox">Sudden Extreme Weight Loss:</label><div><select id="weightLossBox"><option>No</option><option>Yes</option></select></div></div>
+  </div>
+  <div class="err" id="errorLabel" role="alert"></div>
+  <div class="buttons"><button class="btn" id="dataBack" type="button">Back</button><button class="btn" id="dataNext" type="button">Next</button></div>
+</section>
+
+<!-- ===== Screen 3: Assessing your risk ===== -->
+<section id="s-results" class="screen">
+  <div class="topbar"><button class="btn" id="meditationButton" type="button">Daily Meditation</button></div>
+  <h1 class="anim mid" id="t-assessing"></h1>
+  <svg class="donut" viewBox="0 0 240 240" role="img" id="donut" aria-label="Risk score">
+    <circle cx="120" cy="120" r="95" fill="none" stroke="#2d2d2d" stroke-width="26"/>
+    <circle id="ring" cx="120" cy="120" r="95" fill="none" stroke="#66bb6a" stroke-width="26" pathLength="100" stroke-dasharray="0 100" transform="rotate(-90 120 120)"/>
+    <text class="num" id="scoreNum" x="120" y="134" text-anchor="middle">0</text>
+    <text class="cap" x="120" y="162" text-anchor="middle">RISK SCORE</text>
+  </svg>
+  <section class="tip"><h2>TIP OF THE DAY</h2><p id="tipText"></p><p class="foot">Come back tomorrow for a fresh tip. Small daily check-ins build healthy habits!</p></section>
+  <pre class="details grow" id="resultsArea" tabindex="0"></pre>
+  <div class="buttons">
+    <button class="btn" id="resBack" type="button">Back</button>
+    <button class="btn" id="resNew" type="button">Create New</button>
+    <button class="btn" id="resHome" type="button">Home</button>
+    <button class="btn" id="resLock" type="button">Lock</button>
+  </div>
+</section>
+
+<!-- ===== Lock screen ===== -->
+<section id="s-lock" class="screen">
+  <h1 class="anim big" id="t-lock"></h1>
+  <div class="grow">
+    <form class="stack" id="lockForm" autocomplete="off">
+      <p class="prompt">Enter your name and passcode to unlock your profile</p>
+      <label for="lockName">Name</label>
+      <input id="lockName" type="text" maxlength="50" autocomplete="off">
+      <label for="lockPass">Passcode</label>
+      <input id="lockPass" type="password" maxlength="128" autocomplete="off">
+      <div class="err" id="lockError" role="alert"></div>
+      <div class="buttons"><button class="btn" id="unlockBtn" type="submit">Unlock</button><button class="btn" id="forgotBtn" type="button">Forgot passcode?</button></div>
+    </form>
+  </div>
+</section>
+
+<!-- ===== Daily meditation ===== -->
+<section id="s-med" class="screen">
+  <div class="grow"><div class="med" id="med" aria-hidden="true"></div>
+    <p class="sr">Welcome to your daily meditation. Breathe in. Five, four, three, two, one. Breathe out. Relax as you get ready to begin or end your day.</p></div>
+  <div class="buttons"><button class="btn" id="medBack" type="button">Back</button><button class="btn" id="medReplay" type="button">Replay</button></div>
+</section>
+
+</main>
+<script>
+"use strict";
+(function () {
+  const $ = (id) => document.getElementById(id);
+
+  // ===== Daily tips: one is shown per day, and it changes at midnight =====
+  const TIPS = [
+    "Take a 10-minute walk after your next meal. Small habits add up, and you can start today.",
+    "Swap one sugary drink for a glass of water today.",
+    "Aim for 7 to 9 hours of sleep tonight. Good rest helps your body manage energy and stress.",
+    "Add one extra vegetable to your plate today. Little upgrades make healthy eating stick.",
+    "Stand up and stretch for a few minutes every hour. Movement keeps your day energized.",
+    "Check in with yourself: how are your energy, thirst and mood today? Noticing changes is the first step.",
+    "Choose a whole grain over a refined one at one meal today.",
+    "Pick a piece of fruit instead of a sugary snack today.",
+    "Take the stairs, park a little farther away, or walk while you take a call. Every bit of movement counts.",
+    "Drink a glass of water before each meal today. It's an easy habit to build.",
+    "Plan tomorrow's meals tonight so the healthy choice is the easy one.",
+    "Try five minutes of slow, deep breathing today. Managing stress supports your overall health.",
+    "Celebrate a small win today. Being consistent matters more than being perfect.",
+    "Keep up with regular check-ups, and write down any questions for your healthcare provider."
+  ];
+  function todaysTip() {
+    const now = new Date();
+    const day = Math.floor((now.getTime() - now.getTimezoneOffset() * 60000) / 86400000);   // local calendar day
+    return TIPS[day % TIPS.length];
+  }
+
+  // ===== State (memory only; the encryption key is never stored) =====
+  const STORE_KEY = "diainfo.profile.v1";
+  const FAIL_KEY = "diainfo.fails.v1";
+  const IDLE_LOCK_MS = 5 * 60 * 1000;
+  const MAX_FREE_ATTEMPTS = 5;
+  let hasProfile = false;
+  let savedProfile = null;
+  let sessionKey = null;       // CryptoKey, non-extractable
+  let sessionSalt = null;
+  let eraseArmed = false;
+
+  // =====================================================
+  // Security: the profile is stored ENCRYPTED, unlocked by a passcode
+  //  - Key: PBKDF2-HMAC-SHA256 (600,000 rounds, random salt)
+  //  - Cipher: AES-256-GCM (also detects any tampering)
+  //  - The passcode and key are never saved; this page makes no network requests
+  // =====================================================
+  const MAGIC = new Uint8Array([68, 73, 65, 49]);   // "DIA1"
+  const SALT_LEN = 16, IV_LEN = 12, ITERATIONS = 600000;
+  const enc = new TextEncoder(), dec = new TextDecoder();
+
+  function cryptoOk() { return !!(window.crypto && crypto.subtle); }
+
+  function toB64(bytes) {
+    let s = "";
+    for (let i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
+    return btoa(s);
+  }
+  function fromB64(text) {
+    const s = atob(text), out = new Uint8Array(s.length);
+    for (let i = 0; i < s.length; i++) out[i] = s.charCodeAt(i);
+    return out;
+  }
+
+  async function deriveKey(pass, salt) {
+    const base = await crypto.subtle.importKey("raw", enc.encode(pass), "PBKDF2", false, ["deriveKey"]);
+    return crypto.subtle.deriveKey({ name: "PBKDF2", hash: "SHA-256", salt, iterations: ITERATIONS },
+      base, { name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]);
+  }
+
+  async function writeProfile(props, salt, key) {
+    const iv = crypto.getRandomValues(new Uint8Array(IV_LEN));        // a fresh random IV for every save
+    const ct = new Uint8Array(await crypto.subtle.encrypt(
+      { name: "AES-GCM", iv, additionalData: MAGIC, tagLength: 128 }, key, enc.encode(JSON.stringify(props))));
+    const out = new Uint8Array(MAGIC.length + SALT_LEN + IV_LEN + ct.length);
+    out.set(MAGIC, 0); out.set(salt, MAGIC.length); out.set(iv, MAGIC.length + SALT_LEN); out.set(ct, MAGIC.length + SALT_LEN + IV_LEN);
+    localStorage.setItem(STORE_KEY, toB64(out));
+  }
+
+  // Throws "BADKEY" for a wrong passcode or a modified file, "BADFILE" if it can't be read at all
+  async function readProfile(pass) {
+    let data;
+    try {
+      const raw = localStorage.getItem(STORE_KEY);
+      if (!raw || raw.length > 90000) throw 0;
+      data = fromB64(raw);
+      const header = MAGIC.length + SALT_LEN + IV_LEN;
+      if (data.length < header + 16) throw 0;
+      for (let i = 0; i < MAGIC.length; i++) if (data[i] !== MAGIC[i]) throw 0;
+    } catch (e) { throw new Error("BADFILE"); }
+    const salt = data.slice(MAGIC.length, MAGIC.length + SALT_LEN);
+    const iv = data.slice(MAGIC.length + SALT_LEN, MAGIC.length + SALT_LEN + IV_LEN);
+    const ct = data.slice(MAGIC.length + SALT_LEN + IV_LEN);
+    const key = await deriveKey(pass, salt);
+    let plain;
+    try {
+      plain = new Uint8Array(await crypto.subtle.decrypt({ name: "AES-GCM", iv, additionalData: MAGIC, tagLength: 128 }, key, ct));
+    } catch (e) { throw new Error("BADKEY"); }
+    let props;
+    try { props = JSON.parse(dec.decode(plain)); } catch (e) { throw new Error("BADFILE"); }
+    plain.fill(0);
+    return { props, salt, key };
+  }
+
+  function storedProfileExists() {
+    try { return localStorage.getItem(STORE_KEY) !== null; } catch (e) { return false; }
+  }
+
+  // ----- Failed-attempt lockout (5 free tries, then 15s doubling up to 5 minutes) -----
+  function getFails() {
+    try { const f = JSON.parse(localStorage.getItem(FAIL_KEY) || "{}"); return { n: f.n | 0, until: +f.until || 0 }; }
+    catch (e) { return { n: 0, until: 0 }; }
+  }
+  function setFails(f) { try { localStorage.setItem(FAIL_KEY, JSON.stringify(f)); } catch (e) { /* ignore */ } }
+
+  // ----- Input rules -----
+  function nameProblem(name) {
+    if (name === "") return "Please enter your name.";
+    if (name.length > 50) return "Please use 50 characters or fewer.";
+    if (/[\u0000-\u001f\u007f-\u009f]/.test(name)) return "Your name can't contain control characters.";
+    return null;
+  }
+  function passcodeProblem(p) {
+    if (p.length < 8) return "Use at least 8 characters.";
+    if (p.length > 128) return "Use 128 characters or fewer.";
+    if (!/\p{L}/u.test(p) || !/\p{Nd}/u.test(p)) return "Include at least one letter and one number.";
+    return null;
+  }
+  function firstName(name) { const n = name.indexOf(" "); return n === -1 ? name : name.substring(0, n); }
+
+  // =====================================================
+  // Title text animation: each letter fades in while gliding up into place
+  // =====================================================
+  function setTitle(el, text) {
+    el.setAttribute("aria-label", text);
+    el.textContent = "";
+    [...text].forEach((ch, i) => {
+      const s = document.createElement("span");
+      s.textContent = ch;
+      s.setAttribute("aria-hidden", "true");
+      s.style.animationDelay = (i * 70) + "ms";
+      el.appendChild(s);
+    });
+  }
+  function startTitle(el) {
+    el.classList.remove("go");
+    void el.offsetWidth;          // restart the animation
+    el.classList.add("go");
+  }
+
+  // =====================================================
+  // Screens
+  // =====================================================
+  const SCREENS = ["name", "data", "results", "lock", "med"];
+  function show(name) {
+    SCREENS.forEach((s) => $("s-" + s).classList.toggle("active", s === name));
+    if (name !== "med") stopMeditation();
+    window.scrollTo(0, 0);
+  }
+
+  function showNameScreen() {
+    $("nameError").textContent = ""; $("passError").textContent = "";
+    $("nameBack").style.display = hasProfile ? "" : "none";
+    $("passPanel").style.display = sessionKey === null ? "" : "none";   // only first-time users create a passcode
+    show("name");
+    startTitle($("t-welcome"));
+    $("nameField").focus({ preventScroll: true });
+  }
+  function restoreSavedName() {
+    if (savedProfile) $("nameField").value = savedProfile.name || "";
+    $("nameError").textContent = "";
+  }
+  function showDataScreen() {
+    show("data");
+    startTitle($("t-welcomeBack"));
+  }
+  function showResultsScreen() {
+    $("tipText").textContent = todaysTip();
+    show("results");
+    startTitle($("t-assessing"));
+    startDonut();
+  }
+  function showLockScreen() {
+    disarmErase();
+    $("lockName").value = ""; $("lockPass").value = ""; $("lockError").textContent = "";
+    show("lock");
+    startTitle($("t-lock"));
+    $("lockName").focus({ preventScroll: true });
+  }
+
+  // =====================================================
+  // Name screen
+  // =====================================================
+  $("nameNext").addEventListener("click", async () => {
+    const name = $("nameField").value.trim();
+    const problem = nameProblem(name);
+    if (problem) { $("nameError").textContent = problem; return; }
+    $("nameError").textContent = "";
+
+    // First time only: create the passcode that will encrypt this profile
+    if (sessionKey === null) {
+      if (!cryptoOk()) {
+        $("passError").textContent = "Encryption isn't available here. Open this page over https:// or on localhost.";
+        return;
+      }
+      const pass = $("passField").value, confirm = $("confirmField").value;
+      const pp = passcodeProblem(pass);
+      if (pp) { $("passError").textContent = pp; return; }
+      if (pass !== confirm) { $("passError").textContent = "The passcodes don't match."; return; }
+      $("nameNext").disabled = true;
+      try {
+        const salt = crypto.getRandomValues(new Uint8Array(SALT_LEN));
+        sessionKey = await deriveKey(pass, salt);
+        sessionSalt = salt;
+      } catch (e) {
+        $("passError").textContent = "Couldn't set up encryption in this browser.";
+        return;
+      } finally { $("nameNext").disabled = false; }
+      $("passField").value = ""; $("confirmField").value = "";
+    }
+    setTitle($("t-welcomeBack"), "Welcome Back, " + firstName(name));
+    showDataScreen();
+  });
+  $("nameBack").addEventListener("click", () => { restoreSavedName(); showResultsScreen(); });
+  [$("nameField"), $("passField"), $("confirmField")].forEach((f) =>
+    f.addEventListener("input", () => { $("nameError").textContent = ""; $("passError").textContent = ""; }));
+  [$("nameField"), $("passField"), $("confirmField")].forEach((f) =>
+    f.addEventListener("keydown", (e) => { if (e.key === "Enter") $("nameNext").click(); }));
+
+  // =====================================================
+  // Stats screen: validation + scoring (your original logic)
+  // =====================================================
+  const FIELDS = [["age", "ageField", "ageError"], ["bmi", "bmiField", "bmiError"], ["bp", "bpField", "bpError"], ["exercise", "exerciseField", "exerciseError"]];
+
+  function clearField(input, error) { error.textContent = ""; input.classList.remove("bad"); input.removeAttribute("aria-invalid"); }
+  function markInvalid(input, error, msg) { error.textContent = msg; input.classList.add("bad"); input.setAttribute("aria-invalid", "true"); }
+  function clearAllFieldErrors() {
+    FIELDS.forEach(([, i, e]) => clearField($(i), $(e)));
+    $("errorLabel").textContent = "";
+  }
+  FIELDS.forEach(([, i, e]) => $(i).addEventListener("input", () => {
+    clearField($(i), $(e));
+    if (!FIELDS.some(([, , er]) => $(er).textContent !== "")) $("errorLabel").textContent = "";
+  }));
+
+  // Like Java's Integer.parseInt: whole numbers only
+  function parseIntStrict(text) {
+    const t = text.trim();
+    if (!/^[+-]?\d+$/.test(t)) return NaN;
+    const v = Number(t);
+    return (v >= -2147483648 && v <= 2147483647) ? v : NaN;
+  }
+  // Like Java's Double.parseDouble, but rejecting "NaN"
+  function parseNumber(text) {
+    const t = text.trim();
+    if (/^[+-]?Infinity$/.test(t)) return t[0] === "-" ? -Infinity : Infinity;
+    if (!/^[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?[dDfF]?$/.test(t)) return NaN;
+    return Number(t.replace(/[dDfF]$/, ""));
+  }
+  // Java prints a whole-number double as "27.0"
+  function javaDouble(d) { return Number.isInteger(d) ? d.toFixed(1) : String(d); }
+
+  // Returns true if everything is valid (and fills in the results); otherwise shows red messages
+  function readAndAssess() {
+    clearAllFieldErrors();
+    let valid = true;
+    const bad = (i, e, m) => { markInvalid($(i), $(e), m); valid = false; };
+
+    const age = parseIntStrict($("ageField").value);
+    if (Number.isNaN(age)) bad("ageField", "ageError", "Please enter a whole number for age.");
+    else if (age < 0) bad("ageField", "ageError", "Please enter a positive value for age.");
+    else if (age > 120) bad("ageField", "ageError", "Please enter a realistic age (0 to 120).");
+
+    const bmi = parseNumber($("bmiField").value);
+    if (Number.isNaN(bmi)) bad("bmiField", "bmiError", "Please enter a number for BMI.");
+    else if (bmi < 0) bad("bmiField", "bmiError", "Please enter a positive value for BMI.");
+    else if (bmi < 10 || bmi > 100) bad("bmiField", "bmiError", "Please enter a realistic BMI (10 to 100).");
+
+    const bp = parseNumber($("bpField").value);
+    if (Number.isNaN(bp)) bad("bpField", "bpError", "Please enter a number for blood pressure.");
+    else if (bp < 0) bad("bpField", "bpError", "Please enter a positive blood pressure.");
+    else if (bp < 50 || bp > 300) bad("bpField", "bpError", "Please enter a realistic value (50 to 300).");
+
+    const ex = parseNumber($("exerciseField").value);
+    if (Number.isNaN(ex)) bad("exerciseField", "exerciseError", "Please enter a number for weekly exercise.");
+    else if (ex > 168 || ex < 0) bad("exerciseField", "exerciseError", "Please enter a realistic value (0 to 168).");
+
+    if (!valid) {
+      $("errorLabel").textContent = "Please correct the variables marked in red before continuing.";
+      return false;
+    }
+
+    const familyHistory = $("familyBox").value, polyuria = $("polyuriaBox").value,
+          polydipsia = $("polydipsiaBox").value, weightLoss = $("weightLossBox").value;
+
+    let out = "Assessment Results:\n";
+    out += "Age: " + age + "\n";
+    out += "BMI: " + javaDouble(bmi) + "\n";
+    out += "Blood Pressure: " + javaDouble(bp) + "\n";
+    out += "Weekly Excercise: " + javaDouble(ex) + "\n";
+    out += "Family History of Diabetes: " + familyHistory + "\n";
+    out += "Polyuria: " + polyuria + "\n";
+    out += "Polydipsia: " + polydipsia + "\n";
+    out += "Sudden Extreme Weight Loss: " + weightLoss + "\n";
+
+    let risk = 0;
+    // Age (max 6)
+    if (age > 75) risk += 6; else if (age > 65) risk += 4; else if (age > 45) risk += 2;
+    // BMI (max 16)
+    if (bmi > 30) risk += 16; else if (bmi > 25) risk += 10; else if (bmi > 20) risk += 5;
+    // Blood pressure (max 14)
+    if (bp > 140) risk += 14; else if (bp > 120) risk += 7;
+    // Weekly exercise (max 4)
+    if (ex < 2.5) risk += 4; else if (ex < 5) risk += 2;
+    // Family history (max 18), polyuria (17), polydipsia (17), sudden weight loss (8)
+    if (familyHistory === "Yes") risk += 18;
+    if (polyuria === "Yes") risk += 17;
+    if (polydipsia === "Yes") risk += 17;
+    if (weightLoss === "Yes") risk += 8;
+
+    donutScore = Math.max(0, Math.min(100, risk));
+    out += "\n";
+    if (risk >= 50) {
+      out += "You are at high risk for diabetes. Please consult a healthcare professional.\n";
+      out += "Tips:\n";
+      out += "- Maintain a healthy diet rich in fruits, vegetables, and whole grains.\n";
+      out += "- Engage in regular physical activity (at least 150 minutes of moderate exercise per week).\n";
+      out += "- Monitor your blood sugar levels regularly.\n";
+      out += "- Consult with a healthcare professional for personalized advice.\n";
+      out += "- Avoid excessive sugar intake and processed foods.\n";
+      out += "- Look out for symptoms of diabetes such as increased thirst, frequent urination, and unexplained weight loss.\n";
+    } else if (risk >= 30) {
+      out += "You are at moderate risk for diabetes. Consider lifestyle changes and regular check-ups.\n";
+      out += "Tips:\n";
+      out += "- Maintain a balanced diet and avoid excessive sugar intake.\n";
+      out += "- Increase physical activity and aim for at least 150 minutes of exercise per week.\n";
+      out += "- Schedule regular check-ups with your healthcare provider to monitor your health.\n";
+      out += "- Be aware of any symptoms of diabetes.\n";
+      out += "- Look out for symptoms of diabetes such as increased thirst, frequent urination, and unexplained weight loss.\n";
+    } else {
+      out += "You are at low risk for diabetes. Maintain a healthy lifestyle.\n";
+      out += "Tips:\n";
+      out += "- Continue to eat a balanced diet and engage in regular physical activity.\n";
+      out += "- Keep up with regular health check-ups to monitor your overall health.\n";
+      out += "- Avoid excessive sugar intake and processed foods to reduce your risk of developing diabetes.\n";
+    }
+    out += "\nRemember that this is just a risk assessment, so it doesn't definitively determine whether you will get diabetes in the future. Stay healthy!";
+    $("resultsArea").textContent = out;
+    $("resultsArea").scrollTop = 0;
+    return true;
+  }
+
+  function fillFields(p) {
+    $("ageField").value = p.age || ""; $("bmiField").value = p.bmi || "";
+    $("bpField").value = p.bloodPressure || ""; $("exerciseField").value = p.exercise || "";
+    $("familyBox").value = p.familyHistory === "Yes" ? "Yes" : "No";
+    $("polyuriaBox").value = p.polyuria === "Yes" ? "Yes" : "No";
+    $("polydipsiaBox").value = p.polydipsia === "Yes" ? "Yes" : "No";
+    $("weightLossBox").value = p.weightLoss === "Yes" ? "Yes" : "No";
+  }
+  function clearStats() {
+    ["ageField", "bmiField", "bpField", "exerciseField"].forEach((i) => { $(i).value = ""; });
+    ["familyBox", "polyuriaBox", "polydipsiaBox", "weightLossBox"].forEach((i) => { $(i).selectedIndex = 0; });
+  }
+
+  $("dataNext").addEventListener("click", async () => {
+    if (!readAndAssess()) return;
+    const p = {
+      name: $("nameField").value.trim(),
+      age: $("ageField").value.trim(), bmi: $("bmiField").value.trim(),
+      bloodPressure: $("bpField").value.trim(), exercise: $("exerciseField").value.trim(),
+      familyHistory: $("familyBox").value, polyuria: $("polyuriaBox").value,
+      polydipsia: $("polydipsiaBox").value, weightLoss: $("weightLossBox").value
+    };
+    try {
+      if (!sessionKey || !sessionSalt) throw 0;
+      await writeProfile(p, sessionSalt, sessionKey);
+    } catch (e) {
+      $("errorLabel").textContent = "Couldn't save your profile securely. Please try again.";
+      return;
+    }
+    savedProfile = p; hasProfile = true;
+    showResultsScreen();
+  });
+  $("dataBack").addEventListener("click", () => {
+    clearAllFieldErrors();
+    if (hasProfile) { restoreSavedName(); showResultsScreen(); }     // cancel: back to the saved results
+    else showNameScreen();
+  });
+
+  // =====================================================
+  // Results screen
+  // =====================================================
+  $("resBack").addEventListener("click", () => { if (savedProfile) fillFields(savedProfile); clearAllFieldErrors(); showDataScreen(); });
+  $("resNew").addEventListener("click", () => { clearStats(); clearAllFieldErrors(); showDataScreen(); });
+  $("resHome").addEventListener("click", () => showNameScreen());
+  $("resLock").addEventListener("click", () => lockNow());
+  $("meditationButton").addEventListener("click", () => { show("med"); startMeditation(); });
+
+  // Donut-style score ring: fills completely at 100, with the number in the middle
+  let donutScore = 0, donutRaf = 0;
+  function ringColor(s) { return s >= 50 ? "#ef5350" : s >= 30 ? "#ffa726" : "#66bb6a"; }
+  function startDonut() {
+    cancelAnimationFrame(donutRaf);
+    const ring = $("ring"), num = $("scoreNum");
+    ring.setAttribute("stroke", ringColor(donutScore));
+    $("donut").setAttribute("aria-label", "Risk score " + donutScore + " out of 100");
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const t0 = performance.now(), D = 2200;
+    const draw = (now) => {
+      let p = reduce ? 1 : Math.min(1, (now - t0) / D);
+      p = 1 - Math.pow(1 - p, 3);                       // slows down near the end
+      const shown = donutScore * p;
+      ring.setAttribute("stroke-dasharray", (shown > 0.05 ? shown : 0) + " 100");
+      num.textContent = String(Math.round(shown));
+      if (p < 1) donutRaf = requestAnimationFrame(draw);
+    };
+    donutRaf = requestAnimationFrame(draw);
+  }
+
+  // =====================================================
+  // Lock screen, locking, and erasing
+  // =====================================================
+  function setLockMessage(m) { $("lockError").textContent = m; }
+
+  $("lockForm").addEventListener("submit", (e) => { e.preventDefault(); tryUnlock(); });
+  [$("lockName"), $("lockPass")].forEach((f) => f.addEventListener("input", () => { $("lockError").textContent = ""; disarmErase(); }));
+
+  async function tryUnlock() {
+    const f = getFails();
+    const now = Date.now();
+    if (now < f.until) {
+      setLockMessage("Too many incorrect attempts.\nTry again in " + Math.ceil((f.until - now) / 1000) + " seconds.");
+      return;
+    }
+    const enteredName = $("lockName").value.trim();
+    const pass = $("lockPass").value;
+    if (enteredName === "") { setLockMessage("Please enter your name."); return; }
+    if (pass === "") { setLockMessage("Please enter your passcode."); return; }
+    if (!cryptoOk()) { setLockMessage("Encryption isn't available here.\nOpen this page over https:// or on localhost."); return; }
+
+    $("unlockBtn").disabled = true;
+    try {
+      const opened = await readProfile(pass);
+      // The name is stored only inside the encrypted profile, so it's checked after decryption.
+      // A wrong name is treated exactly like a wrong passcode.
+      const stored = String(opened.props.name || "").trim();
+      if (stored.toLowerCase() !== enteredName.toLowerCase()) throw new Error("BADKEY");
+      if (!applyProfile(opened.props)) {
+        wipeSession();
+        setLockMessage("Your saved profile couldn't be read.\nUse \"Forgot passcode?\" to start over.");
+        return;
+      }
+      sessionKey = opened.key; sessionSalt = opened.salt;
+      setFails({ n: 0, until: 0 });
+      $("lockName").value = ""; $("lockPass").value = "";
+      showResultsScreen();
+    } catch (e) {
+      $("lockPass").value = "";
+      if (e && e.message === "BADKEY") {
+        const n = getFails().n + 1;
+        let until = 0, msg;
+        if (n >= MAX_FREE_ATTEMPTS) {
+          const delay = Math.min(300, 15 * Math.pow(2, Math.min(n - MAX_FREE_ATTEMPTS, 5)));   // 15s, 30s, 60s ... 5 min
+          until = Date.now() + delay * 1000;
+          msg = "Too many incorrect attempts.\nTry again in " + delay + " seconds.";
+        } else {
+          msg = "Incorrect name or passcode. Please try again.";
+        }
+        setFails({ n, until });
+        setLockMessage(msg);
+      } else {
+        setLockMessage("Your saved profile couldn't be read.\nUse \"Forgot passcode?\" to start over.");
+      }
+    } finally { $("unlockBtn").disabled = false; }
+  }
+
+  // Fills in the screens from an unlocked profile; returns false if the data isn't valid
+  function applyProfile(p) {
+    const name = String(p.name || "").trim();
+    if (nameProblem(name) !== null || ["age", "bmi", "bloodPressure", "exercise"].some((k) => typeof p[k] !== "string")) return false;
+    $("nameField").value = name;
+    fillFields(p);
+    setTitle($("t-welcomeBack"), "Welcome Back, " + firstName(name));
+    if (!readAndAssess()) return false;
+    savedProfile = p; hasProfile = true;
+    return true;
+  }
+
+  // "Forgot passcode?": the first click asks to confirm, the second click erases everything
+  $("forgotBtn").addEventListener("click", () => {
+    if (!eraseArmed) {
+      eraseArmed = true;
+      $("forgotBtn").textContent = "Erase and start over";
+      $("forgotBtn").classList.add("warn");
+      setLockMessage("Passcodes can't be recovered.\nErasing permanently deletes your saved profile.\nClick again to confirm.");
+      return;
+    }
+    try { localStorage.removeItem(STORE_KEY); localStorage.removeItem(FAIL_KEY); } catch (e) { /* ignore */ }
+    wipeSession();
+    disarmErase();
+    showNameScreen();
+  });
+  function disarmErase() {
+    eraseArmed = false;
+    $("forgotBtn").textContent = "Forgot passcode?";
+    $("forgotBtn").classList.remove("warn");
+  }
+
+  // Clears all personal data from the screens and from memory
+  function wipeSession() {
+    stopMeditation();
+    sessionKey = null; sessionSalt = null; savedProfile = null; hasProfile = false;
+    $("nameField").value = ""; $("passField").value = ""; $("confirmField").value = "";
+    clearStats();
+    $("resultsArea").textContent = "";
+    donutScore = 0; cancelAnimationFrame(donutRaf);
+    $("scoreNum").textContent = "0"; $("ring").setAttribute("stroke-dasharray", "0 100");
+    setTitle($("t-welcomeBack"), "Welcome Back");
+    clearAllFieldErrors();
+    $("nameError").textContent = ""; $("passError").textContent = "";
+  }
+  function lockNow() { wipeSession(); showLockScreen(); }
+
+  // Locks automatically after 5 minutes with no mouse, touch or keyboard activity
+  let idleTimer = 0;
+  function armIdle() {
+    clearTimeout(idleTimer);
+    idleTimer = setTimeout(() => { if (sessionKey !== null && storedProfileExists()) lockNow(); }, IDLE_LOCK_MS);
+  }
+  ["mousemove", "mousedown", "keydown", "touchstart", "scroll"].forEach((ev) => window.addEventListener(ev, armIdle, { passive: true }));
+  armIdle();
+
+  // =====================================================
+  // Daily Meditation: letters fade in one after another, hold, then fade away
+  //   Welcome -> Breathe In -> 5 4 3 2 1 -> Breathe Out -> Relax ...
+  // =====================================================
+  // text, size, accent, staggerMs, fadeInMs, holdMs, fadeOutMs, gapMs   (change these to slow it down or speed it up)
+  const STEP_DEFS = [
+    ["Welcome to Your\nDaily Meditation", 40, false, 110, 1400, 1500, 1800, 600],
+    ["Breathe In", 54, false, 150, 1400, 900, 1600, 500],
+    ["5", 150, true, 0, 450, 300, 450, 100], ["4", 150, true, 0, 450, 300, 450, 100],
+    ["3", 150, true, 0, 450, 300, 450, 100], ["2", 150, true, 0, 450, 300, 450, 100],
+    ["1", 150, true, 0, 450, 300, 450, 100],
+    ["Breathe Out", 54, false, 150, 1400, 900, 2200, 600],
+    ["Relax As You Get Ready\nto Begin or End Your Day", 34, false, 70, 2000, 1500, 3600, 0]
+  ];
+  const STEPS = STEP_DEFS.map((d) => {
+    const s = { text: d[0], size: d[1], accent: d[2], stagger: d[3], fadeIn: d[4], hold: d[5], fadeOut: d[6], gap: d[7] };
+    s.letters = s.text.replace(/\n/g, "").length;
+    s.fadeOutStart = (s.letters - 1) * s.stagger + s.fadeIn + s.hold;
+    s.duration = s.fadeOutStart + s.fadeOut;
+    return s;
+  });
+  const STARTS = []; let TOTAL = 0;
+  STEPS.forEach((s) => { STARTS.push(TOTAL); TOTAL += s.duration + s.gap; });
+
+  const clamp = (x) => Math.max(0, Math.min(1, x));
+  const smooth = (x) => x * x * (3 - 2 * x);
+  function letterAlpha(step, i, t) {
+    const inn = clamp((t - i * step.stagger) / step.fadeIn);
+    const out = clamp((t - step.fadeOutStart) / step.fadeOut);
+    return smooth(inn) * (1 - smooth(out));
+  }
+
+  let medRaf = 0, medStart = 0, medLetters = [];
+  function buildMeditation() {
+    const med = $("med");
+    med.textContent = "";
+    medLetters = STEPS.map((step) => {
+      const div = document.createElement("div");
+      div.className = "mstep";
+      div.style.fontSize = "min(" + step.size + "px," + Math.max(5, step.size / 6.5) + "vw)";
+      if (step.accent) div.style.color = "var(--accent)";
+      const spans = [];
+      step.text.split("\n").forEach((lineText) => {
+        const line = document.createElement("div");
+        line.className = "mline";
+        lineText.split(" ").forEach((word, wi) => {
+          if (wi > 0) {                                   // the space between words (counts as a letter, like the desktop app)
+            const sp = document.createElement("span");
+            sp.textContent = "\u00a0";
+            line.appendChild(sp);
+            spans.push(sp);
+          }
+          const w = document.createElement("div");        // keeps each word on one line
+          w.className = "mword";
+          for (const ch of word) {
+            const s = document.createElement("span");
+            s.textContent = ch;
+            w.appendChild(s);
+            spans.push(s);
+          }
+          line.appendChild(w);
+        });
+        div.appendChild(line);
+      });
+      med.appendChild(div);
+      return spans;
+    });
+  }
+  function startMeditation() {
+    stopMeditation();
+    buildMeditation();
+    medStart = performance.now();
+    const frame = (now) => {
+      const elapsed = now - medStart;
+      STEPS.forEach((step, k) => {
+        const t = elapsed - STARTS[k];
+        const live = t >= 0 && t < step.duration;
+        medLetters[k].forEach((s, i) => { s.style.opacity = live ? letterAlpha(step, i, t).toFixed(3) : "0"; });
+      });
+      if (elapsed < TOTAL) medRaf = requestAnimationFrame(frame);
+    };
+    medRaf = requestAnimationFrame(frame);
+  }
+  function stopMeditation() {
+    cancelAnimationFrame(medRaf);
+    medLetters.forEach((spans) => spans.forEach((s) => { s.style.opacity = "0"; }));
+  }
+  $("medBack").addEventListener("click", () => { stopMeditation(); showResultsScreen(); });
+  $("medReplay").addEventListener("click", () => startMeditation());
+
+  // Start-up: returning users unlock first (then land on their results); first-timers start at the welcome screen
+  setTitle($("t-welcome"), "Welcome to DiaInfo!");
+  setTitle($("t-welcomeBack"), "Welcome Back");
+  setTitle($("t-assessing"), "Assessing Your Risk of Diabetes...");
+  setTitle($("t-lock"), "Welcome Back");
+  if (storedProfileExists()) showLockScreen(); else showNameScreen();
+})();
+</script>
+</body>
+</html>
